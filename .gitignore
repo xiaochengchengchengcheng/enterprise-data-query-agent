@@ -1,0 +1,32 @@
+# Environment variables and local secrets
+.env
+.env.*
+!.env.example
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Runtime output
+logs/
+outputs/
+*.log
+
+# Local troubleshooting scripts tied to a specific workstation
+work/
+
+# IDE and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
