@@ -1,8 +1,15 @@
 ﻿# 企业内网自主取数智能体
 
-> **English project name:** Enterprise Data Query Agent
+> **English project name:** Enterprise Data Query Agent · v1.1
 
-基于 LangGraph + DeepSeek（兼容OpenAI格式）的企业内网智能取数服务，支持自然语言查询数据库，自动完成表匹配、SQL生成、安全校验、数据脱敏、业务分析全流程。
+基于 LangChain + LangGraph + FastAPI + FastMCP 的企业内网智能取数服务，支持自然语言查询数据库，自动完成表匹配、SQL生成、安全校验、数据脱敏、业务分析全流程。
+
+## 正式版本
+
+| 版本 | 定位 | 发布说明 |
+|------|------|----------|
+| `v1.1.0` | 现代框架栈 Text-to-SQL | [查看 Release](https://github.com/xiaochengchengchengcheng/enterprise-data-query-agent/releases/tag/v1.1.0) |
+| `v1.0.0` | 初始 Text-to-SQL 版本 | [查看 Release](https://github.com/xiaochengchengchengcheng/enterprise-data-query-agent/releases/tag/v1.0.0) |
 
 ## 项目概述
 
@@ -18,9 +25,10 @@
 
 ### 技术栈
 
-- **Python 3.9** — 严格兼容，不使用 3.10+ 语法
+- **Python 3.11** — LangChain、LangGraph 与 FastMCP 统一运行基线
+- **LangChain** — OpenAI-compatible 模型统一适配
 - **LangGraph** — Agent 核心调度框架
-- **FastMCP** — stdio 本地进程通信
+- **FastMCP** — MCP Tool Server 与协议传输
 - **FastAPI** — 后端 RESTful API 服务
 - **Streamlit** — 轻量化内网 Web 页面
 - **pymysql** — MySQL 数据库连接（只读）
@@ -50,17 +58,29 @@ project_root/
 
 ---
 
+## FastMCP 服务
+
+启动只读数据库 MCP Tool Server：
+
+```bash
+python db_mcp_server.py
+```
+
+可供 MCP Client 调用的工具包括 `list_tables`、`describe_table` 和 `execute_query`。所有 SQL 仍会经过只读安全校验、行数限制、脱敏和审计流程。
+
+---
+
 ## 快速开始（Windows Miniconda3）
 
 ### 1. 安装 Miniconda3
 
-从 https://docs.conda.io/en/latest/miniconda.html 下载并安装 Miniconda3（Python 3.9 版本）。
+从 https://docs.conda.io/en/latest/miniconda.html 下载并安装 Miniconda3，并使用 Python 3.11 环境。
 
 ### 2. 创建虚拟环境
 
 ```bash
 # 打开 Anaconda Prompt (Miniconda3)
-conda create -n data_agent python=3.9 -y
+conda create -n data_agent python=3.11 -y
 conda activate data_agent
 ```
 
@@ -207,7 +227,7 @@ source ~/.bashrc
 ### 2. 创建环境并安装依赖
 
 ```bash
-conda create -n data_agent python=3.9 -y
+conda create -n data_agent python=3.11 -y
 conda activate data_agent
 pip install -r requirements.txt
 ```
