@@ -2,7 +2,16 @@
 
 > **English project name:** Enterprise AI Data Analyst · v2.0
 
-这不再只是一个 Text-to-SQL 工具。系统以 StateGraph 编排“需求理解 → RAG 检索 → 分析计划 → 人工确认 → 多数据集查询 → Python 深度分析 → ECharts 报告”的完整工作流，同时保留 v1 `/api/query` 接口用于快速取数。
+这不再只是一个 Text-to-SQL 工具。系统基于 LangGraph 编排“需求理解 → RAG 检索 → 分析计划 → 人工确认 → 多数据集查询 → Python 深度分析 → ECharts 报告”的完整工作流，同时保留 v1 `/api/query` 接口用于快速取数。
+
+## 正式版本
+
+| 版本 | 定位 | 发布说明 |
+|------|------|----------|
+| `v2.0.0` | 企业 AI 智能数据分析师 | [查看 Release](https://github.com/xiaochengchengchengcheng/enterprise-data-query-agent/releases/tag/v2.0.0) |
+| `v1.0.0` | 基础 Text-to-SQL 自主取数智能体 | [查看 Release](https://github.com/xiaochengchengchengcheng/enterprise-data-query-agent/releases/tag/v1.0.0) |
+
+版本号遵循 [Semantic Versioning](https://semver.org/)。分支、提交和发布规则见 [VERSIONING.md](VERSIONING.md)。
 
 ## 项目概述
 
@@ -10,7 +19,7 @@
 
 | 能力 | 说明 |
 |------|------|
-| 智能数据分析 | StateGraph 驱动多表 Text-to-SQL，并利用会话历史理解多轮意图 |
+| 智能数据分析 | LangGraph 驱动多表 Text-to-SQL，并利用会话历史理解多轮意图 |
 | Python 深度分析 | Docker 默认隔离执行，Local 模式需显式开启；支持统计分析与机器学习 |
 | 智能报告生成 | 自动生成包含 ECharts 图表的 HTML 与 Markdown 报告 |
 | 人工反馈机制 | 先展示分析计划，用户可以批准、驳回或提出修改意见 |
@@ -22,7 +31,7 @@
 
 ### 技术栈
 
-- **Python 3.9 / LangGraph** — 兼容既有部署环境的 StateGraph 工作流
+- **Python 3.9 / LangGraph** — 兼容既有部署环境的有状态智能体工作流
 - **FastAPI / Streamlit** — REST API 与人工确认界面
 - **MySQL / PyMySQL** — 数据库只读查询
 - **SQLite Vector Store** — 零额外服务的业务元数据向量库
