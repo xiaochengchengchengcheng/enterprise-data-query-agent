@@ -411,26 +411,27 @@ def create_mcp_server():
         FastMCP 服务实例
     """
     try:
-        from mcp.server.fastmcp import FastMCP
+        from fastmcp import FastMCP
 
         # 创建MCP服务实例
         mcp = FastMCP(
-            'db-query-agent',
-            description='企业内网数据库查询MCP服务 - 仅支持只读SELECT操作',
+            name='db-query-agent',
+            instructions='企业内网数据库查询 MCP 服务，仅支持只读 SELECT 操作。',
+            version='1.1.0',
         )
 
         # 注册工具
-        @mcp.tool()
+        @mcp.tool
         def list_tables() -> Dict[str, Any]:
             """获取数据库中所有数据表名列表"""
             return mcp_list_tables()
 
-        @mcp.tool()
+        @mcp.tool
         def describe_table(table_name: str) -> Dict[str, Any]:
             """获取指定表的字段名、字段类型、字段注释等结构信息"""
             return mcp_describe_table(table_name)
 
-        @mcp.tool()
+        @mcp.tool
         def execute_query(sql: str, user_query: str = '') -> Dict[str, Any]:
             """执行只读SELECT查询，自动校验安全性和限制返回行数"""
             return mcp_execute_query(sql, user_query)
@@ -439,7 +440,7 @@ def create_mcp_server():
         return mcp
 
     except ImportError as e:
-        logger.error('导入 FastMCP 失败，请安装 mcp 包: %s', e)
+        logger.error('导入 FastMCP 失败，请安装 fastmcp 包: %s', e)
         raise
 
 

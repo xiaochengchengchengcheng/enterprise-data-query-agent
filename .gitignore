@@ -13,6 +13,7 @@ __pycache__/
 
 # Virtual environments
 .venv/
+.venv*/
 venv/
 env/
 ENV/
@@ -20,6 +21,7 @@ ENV/
 # Runtime output
 logs/
 outputs/
+data/
 *.log
 
 # Local troubleshooting scripts tied to a specific workstation

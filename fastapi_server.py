@@ -57,11 +57,11 @@ class QueryResponse(BaseModel):
     session_id: str = Field(..., description='会话ID')
     user_query: str = Field(..., description='用户原始提问')
     generated_sql: str = Field('', description='生成的SQL语句')
-    query_columns: List[str] = Field([], description='查询结果列名')
+    query_columns: List[str] = Field(default_factory=list, description='查询结果列名')
     returned_rows: int = Field(0, description='返回数据行数')
     query_duration_ms: float = Field(0.0, description='查询耗时（毫秒）')
     analysis: str = Field('', description='业务分析结论')
-    steps: List[Dict[str, Any]] = Field([], description='执行步骤记录')
+    steps: List[Dict[str, Any]] = Field(default_factory=list, description='执行步骤记录')
     error: str = Field('', description='错误信息（如有）')
 
 
@@ -83,8 +83,8 @@ _start_time = time.time()
 # 创建FastAPI应用
 app = FastAPI(
     title='企业内网自主取数智能体 API',
-    description='基于LangGraph + DeepSeek的企业内网智能取数服务，仅限内网访问',
-    version='1.0.0',
+    description='基于 LangChain + LangGraph 的企业内网智能取数服务，仅限内网访问',
+    version='1.1.0',
     docs_url='/docs',
     redoc_url='/redoc',
 )
@@ -158,14 +158,14 @@ async def health_check():
     uptime = time.time() - _start_time
     return HealthResponse(
         status='running',
-        version='1.0.0',
+        version='1.1.0',
         timestamp=time.strftime('%Y-%m-%d %H:%M:%S'),
         uptime_seconds=round(uptime, 2),
     )
 
 
 @app.post('/api/query', response_model=QueryResponse, tags=['取数'])
-async def execute_query(request: QueryRequest):
+def execute_query(request: QueryRequest):
     """
     执行取数查询
 
@@ -215,7 +215,7 @@ async def execute_query(request: QueryRequest):
 
 
 @app.get('/api/history', tags=['审计'])
-async def get_audit_logs(lines: int = 50):
+def get_audit_logs(lines: int = 50):
     """
     获取审计日志（最近N行）
 
@@ -259,7 +259,7 @@ def start_server():
     port = int(os.environ.get('SERVER_PORT', '8000'))
 
     logger.info('=' * 50)
-    logger.info('企业内网自主取数智能体服务启动')
+    logger.info('企业内网自主取数智能体 v1.1.0 服务启动')
     logger.info('监听地址: %s:%d', host, port)
     logger.info('API文档: http://%s:%d/docs', host if host != '0.0.0.0' else '127.0.0.1', port)
     logger.info('=' * 50)
