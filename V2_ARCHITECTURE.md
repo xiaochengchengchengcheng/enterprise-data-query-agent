@@ -1,4 +1,4 @@
-# Enterprise AI Data Analyst v2 Architecture
+# Enterprise AI Data Analyst v2.1 Architecture
 
 ## 1. Goals
 
@@ -16,15 +16,15 @@ V2 keeps the original read-only Text-to-SQL path and adds an auditable analysis 
 
 | Component | Responsibility |
 |---|---|
-| `advanced_agent_graph.py` | StateGraph planning/execution orchestration and HITL state transitions |
+| `advanced_agent_graph.py` | LangGraph planning/execution orchestration and HITL state transitions |
 | `sql_agent_graph.py` | Existing read-only Text-to-SQL graph; now returns masked rows to v2 |
-| `model_registry.py` | Runtime-selectable chat and embedding providers |
+| `model_registry.py` | LangChain-backed runtime-selectable chat and embedding providers |
 | `rag_store.py` | SQLite persistence for embeddings, metadata and terminology |
 | `python_executor.py` | AST validation plus Docker/explicit Local execution |
 | `report_generator.py` | ECharts HTML and Markdown report generation |
 | `api_key_manager.py` | PBKDF2-hashed keys, scopes, expiry and revocation |
 | `conversation_store.py` | Multi-turn conversation and pending analysis task state |
-| `mcp_server_v2.py` | MCP stdio tools without a Python 3.10-only dependency |
+| `mcp_server_v2.py` | FastMCP tools/resources with stdio transport and generated schemas |
 
 ## 3. State lifecycle
 

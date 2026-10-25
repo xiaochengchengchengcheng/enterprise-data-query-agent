@@ -1,6 +1,6 @@
 # 企业内网自主取数智能体 · 开发文档
 
-> 文档版本: v2.0 | 更新日期: 2026-10-25 | 适用对象: 后端/算法/运维工程师
+> 文档版本: v2.1 | 更新日期: 2026-10-25 | 适用对象: 后端/算法/运维工程师
 >
 > 本文面向参与本项目的开发者,系统梳理系统的架构设计、核心模块实现、智能体工作流、安全机制、数据模型、部署方式与扩展方法。阅读本文前建议先通读 `README.md` 了解项目的使用视角。
 
@@ -33,18 +33,19 @@
 
 | 分类 | 技术 | 版本 | 用途 |
 |------|------|------|------|
-| 语言 | Python | 3.9 | 严格兼容,不使用 3.10+ 语法 |
-| Agent 框架 | LangGraph | 0.0.22 | 有状态图调度,编排取数流程 |
-| 后端框架 | FastAPI | 0.95.2 | RESTful API 服务 |
-| ASGI 服务器 | uvicorn | 0.22.0 | 启动 FastAPI |
-| 数据校验 | Pydantic | 1.10.12 | 请求/响应模型 |
-| 前端 | Streamlit | 1.28.1 | 轻量化 Web 页面 |
+| 语言 | Python | 3.11+ | LangChain、LangGraph 与 FastMCP 统一运行基线 |
+| Agent 组件 | LangChain | 1.4.7 | 模型、Embedding、Retriever 与 Tool 抽象 |
+| Agent 编排 | LangGraph | 1.2.17 | 有状态图调度、HITL 与分析流程 |
+| 后端框架 | FastAPI | 0.162.0 | RESTful API 服务 |
+| ASGI 服务器 | uvicorn | 0.54.0 | 启动 FastAPI |
+| 数据校验 | Pydantic | 2.14.1 | 请求/响应模型 |
+| 前端 | Streamlit | 1.66.1 | 轻量化 Web 页面 |
 | 数据库驱动 | PyMySQL | 1.1.0 | MySQL 连接(只读) |
-| HTTP 客户端 | requests | 2.31.0 | 调用大模型 API |
-| 配置管理 | python-dotenv | 1.0.0 | 读取 `.env` |
-| 协议(可选) | FastMCP | 需 Python>=3.10 | 独立 stdio MCP 服务(本项目 3.9 下未启用) |
+| 模型适配 | langchain-openai | 1.7.2 | OpenAI-compatible Chat/Embedding API |
+| 配置管理 | python-dotenv | 1.2.4 | 读取 `.env` |
+| MCP 框架 | FastMCP | 4.1.3 | Tool/Resource Server 与协议传输 |
 
-> **关键约束**:项目强制 Python 3.9,因此 `mcp` 包(要求 Python>=3.10)在 `requirements.txt` 中被注释掉。Agent 核心取数流程不依赖 MCP 协议,而是**直接进程内 import 调用** `db_mcp_server.py` 中的函数,详见 5.3 节。
+> **运行基线**:从 v2.1.0 起项目要求 Python 3.11+。进程内数据库函数供 LangGraph 节点调用，`mcp_server_v2.py` 则通过 FastMCP 向外部 MCP Client 暴露完整能力。
 
 ---
 
@@ -241,8 +242,8 @@ mcp_execute_query(sql, user_query)  # 安全校验 -> 执行 -> 审计
 
 **双模式设计**(重要):
 
-- **进程内模式(当前 Agent 实际使用)**:`sql_agent_graph.py` 直接 `from db_mcp_server import mcp_list_tables, ...`,绕过 MCP 协议,避免 Python 3.9 下无法安装 `mcp` 包的限制。
-- **独立 stdio 模式(可选)**:`create_mcp_server()` 基于 FastMCP 注册三个 `@mcp.tool()`,`run_mcp_server()` 以 `transport='stdio'` 启动。仅在需要把取数能力暴露给外部 MCP 客户端、且运行环境为 Python 3.10+ 时启用。
+- **进程内模式**:`sql_agent_graph.py` 直接调用数据库工具函数，避免内部调用产生不必要的协议开销。
+- **FastMCP 模式**:`mcp_server_v2.py` 注册查询、分析、模型和 RAG 工具，并以 stdio 等传输方式提供给外部 MCP Client。
 
 `mcp_execute_query` 内部先调用 `validate_sql`,被拦截时记录 `intercepted` 审计日志并返回;通过后执行查询并记录 `success` 审计日志。
 
@@ -549,7 +550,7 @@ sequenceDiagram
 ### 12.1 环境准备
 
 ```bash
-conda create -n data_agent python=3.9 -y
+conda create -n data_agent python=3.11 -y
 conda activate data_agent
 pip install -r requirements.txt
 ```
@@ -676,7 +677,6 @@ async def execute_query(request: QueryRequest):
 | P3 | `fastapi_server.py` | CORS `allow_origins=['*']` | 依赖 IP 白名单控制,若同源部署可收紧为具体域名 |
 | P3 | `security_middleware.py` `AuditLogger` | 文本文件追加写,高并发下无显式文件锁 | 高并发场景可加 `threading.Lock` 或改用结构化日志 |
 | P3 | `streamlit_web.py` | 「查询结果」Tab 只展示列名与行数,不展示实际数据 | 如需前端直接展示,可在 `QueryResponse` 中透出脱敏后的 rows |
-| P3 | `db_mcp_server.py` | 独立 MCP stdio 服务需 Python 3.10+,当前 3.9 未启用 | 如确需 MCP 能力,升级 Python 版本并解注释 `mcp` 依赖 |
 
 > 说明:P1/P2 不影响当前主流程可用性(均有 fallback 或仅风格问题),但建议在下一轮迭代中处理。
 
