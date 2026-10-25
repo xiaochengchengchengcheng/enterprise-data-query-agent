@@ -1,8 +1,8 @@
-﻿# 企业内网自主取数智能体
+﻿# 企业 AI 智能数据分析师
 
-> **English project name:** Enterprise Data Query Agent
+> **English project name:** Enterprise AI Data Analyst · v2.0
 
-基于 LangGraph + DeepSeek（兼容OpenAI格式）的企业内网智能取数服务，支持自然语言查询数据库，自动完成表匹配、SQL生成、安全校验、数据脱敏、业务分析全流程。
+这不再只是一个 Text-to-SQL 工具。系统以 StateGraph 编排“需求理解 → RAG 检索 → 分析计划 → 人工确认 → 多数据集查询 → Python 深度分析 → ECharts 报告”的完整工作流，同时保留 v1 `/api/query` 接口用于快速取数。
 
 ## 项目概述
 
@@ -10,21 +10,40 @@
 
 | 能力 | 说明 |
 |------|------|
-| 自然语言取数 | 输入业务需求，AI自动查表、生成SQL、执行查询 |
-| 安全合规 | 高危SQL拦截、敏感数据脱敏、只读账号、IP白名单 |
-| 审计追溯 | 全操作不可删除审计日志 |
-| 内网部署 | 纯后端服务，跨平台兼容 Windows / Linux |
-| 国内大模型 | 仅对接国内 DeepSeek 兼容 OpenAI 格式 API |
+| 智能数据分析 | StateGraph 驱动多表 Text-to-SQL，并利用会话历史理解多轮意图 |
+| Python 深度分析 | Docker 默认隔离执行，Local 模式需显式开启；支持统计分析与机器学习 |
+| 智能报告生成 | 自动生成包含 ECharts 图表的 HTML 与 Markdown 报告 |
+| 人工反馈机制 | 先展示分析计划，用户可以批准、驳回或提出修改意见 |
+| RAG 检索增强 | SQLite 持久化向量库检索业务元数据和术语；可接 OpenAI 兼容 Embedding API |
+| 多模型调度 | Chat/Embedding 模型注册表支持请求级动态选择 |
+| MCP 服务器 | Python 3.9 可运行的 MCP stdio Tool Server |
+| API Key 管理 | Key 仅保存 PBKDF2 哈希，支持 Scope、过期时间、撤销和使用记录 |
+| 安全合规 | 只读 SQL、数据脱敏、IP 白名单、审计日志和 Python 资源隔离 |
 
 ### 技术栈
 
-- **Python 3.9** — 严格兼容，不使用 3.10+ 语法
-- **LangGraph** — Agent 核心调度框架
-- **FastMCP** — stdio 本地进程通信
-- **FastAPI** — 后端 RESTful API 服务
-- **Streamlit** — 轻量化内网 Web 页面
-- **pymysql** — MySQL 数据库连接（只读）
-- **DeepSeek API** — 国内大模型（兼容 OpenAI 格式）
+- **Python 3.9 / LangGraph** — 兼容既有部署环境的 StateGraph 工作流
+- **FastAPI / Streamlit** — REST API 与人工确认界面
+- **MySQL / PyMySQL** — 数据库只读查询
+- **SQLite Vector Store** — 零额外服务的业务元数据向量库
+- **Docker / pandas / NumPy / SciPy / scikit-learn** — 隔离的深度分析运行时
+- **ECharts** — 交互式 HTML 图表报告
+- **OpenAI-compatible APIs** — 支持 DeepSeek 等 Chat/Embedding 模型
+
+### V2 工作流
+
+```mermaid
+flowchart LR
+    Q[自然语言需求] --> R[RAG 业务检索]
+    R --> P[生成分析计划]
+    P --> H{人工确认}
+    H -->|修改| P
+    H -->|批准| S[多数据集 Text-to-SQL]
+    S --> D[脱敏数据]
+    D --> X[Docker/Local Python 分析]
+    X --> A[分析结论]
+    A --> E[HTML/Markdown + ECharts 报告]
+```
 
 ---
 
@@ -35,10 +54,20 @@ project_root/
 ├── .env                        # 环境变量配置模板
 ├── security_middleware.py      # 安全工具包：脱敏、SQL拦截、审计日志
 ├── llm_gateway.py              # 大模型统一调用网关
+├── model_registry.py           # Chat / Embedding 模型注册与动态切换
+├── rag_store.py                # SQLite 持久化向量库
 ├── db_mcp_server.py            # 数据库MCP工具服务
 ├── sql_agent_graph.py          # LangGraph 取数智能体核心循环
+├── advanced_agent_graph.py     # V2 计划、HITL、Python 与报告编排
+├── python_executor.py          # Docker / Local 受控 Python 执行器
+├── report_generator.py         # ECharts HTML / Markdown 报告
+├── api_key_manager.py          # API Key 生命周期与 Scope 管理
+├── conversation_store.py       # 多轮对话与分析任务状态
+├── mcp_server_v2.py            # MCP stdio Tool Server
 ├── fastapi_server.py           # FastAPI 后端接口服务
 ├── streamlit_web.py            # Streamlit 轻量化Web页面
+├── docker/                     # Python 分析沙箱镜像
+├── tests/                      # V2 自动化测试
 ├── requirements.txt            # 依赖包清单
 ├── rebuild_db.py               # 数据库一键初始化重建脚本（建库建表建账号+测试数据）
 ├── start.bat                   # Windows 一键启动脚本（FastAPI + Streamlit）
@@ -50,7 +79,64 @@ project_root/
 
 ---
 
-## 快速开始（Windows Miniconda3）
+## V2 快速体验
+
+复制配置并填写数据库与模型参数：
+
+```bash
+copy .env.example .env
+pip install -r requirements.txt
+```
+
+Docker 是 Python 深度分析的默认执行方式。首次使用需要构建分析镜像：
+
+```bash
+docker build -f docker/Dockerfile.analysis -t enterprise-data-analyst-python:latest .
+```
+
+启动后端和前端：
+
+```bash
+python fastapi_server.py
+streamlit run streamlit_web.py --server.port 8501
+```
+
+### 人工确认分析流程
+
+1. 调用 `POST /api/v2/analyses/plan` 生成分析计划；
+2. 前端展示 SQL 子任务、Python 目标、图表建议和假设；
+3. 调用 `POST /api/v2/analyses/{analysis_id}/review`，可提交修改意见或批准执行；
+4. 执行完成后，通过任务响应中的 `report.html_url` 和 `report.markdown_url` 获取报告。
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v2/analyses/plan \
+  -H "Content-Type: application/json" \
+  -d '{"user_query":"分析各地区销售趋势，识别异常并预测下月销售额"}'
+```
+
+### MCP Server
+
+```json
+{
+  "mcpServers": {
+    "enterprise-data-analyst": {
+      "command": "python",
+      "args": ["mcp_server_v2.py"]
+    }
+  }
+}
+```
+
+### 安全说明
+
+- Python 默认在 `--network none`、只读根文件系统、CPU/内存/PID 限制的 Docker 容器中运行；
+- Local 模式不是强安全沙箱，只有设置 `ALLOW_LOCAL_PYTHON_EXECUTION=true` 才能启用；
+- `.env`、向量库、API Key 数据库、报告、日志和缓存均不会提交到 Git；
+- 开启 `API_KEY_AUTH_ENABLED=true` 前必须设置高强度 `ADMIN_API_KEY`，客户端通过 `X-API-Key` 传递凭据。
+
+---
+
+## 基础部署（Windows Miniconda3）
 
 ### 1. 安装 Miniconda3
 

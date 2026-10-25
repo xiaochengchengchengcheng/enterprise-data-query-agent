@@ -7,6 +7,7 @@
 
 set -e
 cd "$(dirname "$0")"
+mkdir -p logs
 
 PYTHON=$(conda run -n agent-env which python 2>/dev/null || echo "python3")
 

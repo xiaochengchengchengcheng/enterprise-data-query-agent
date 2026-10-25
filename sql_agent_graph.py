@@ -509,6 +509,7 @@ def run_agent(user_query: str, session_id: str = '') -> Dict[str, Any]:
             'returned_rows': result.get('returned_rows', 0),
             'query_duration_ms': result.get('query_duration_ms', 0),
             'analysis': result.get('analysis_result', ''),
+            'data': result.get('masked_query_result', []),
             'steps': result.get('steps', []),
             'error': result.get('error_message', ''),
         }
@@ -527,6 +528,7 @@ def run_agent(user_query: str, session_id: str = '') -> Dict[str, Any]:
             'returned_rows': 0,
             'query_duration_ms': 0,
             'analysis': '',
+            'data': [],
             'steps': [],
             'error': 'Agent运行异常: ' + str(e),
         }
