@@ -10,6 +10,7 @@
 |------|------|----------|
 | `v2.1.0` | LangChain + LangGraph + FastAPI + FastMCP 现代化版本 | [查看 Release](https://github.com/xiaochengchengchengcheng/enterprise-data-query-agent/releases/tag/v2.1.0) |
 | `v2.0.0` | 企业 AI 智能数据分析师 | [查看 Release](https://github.com/xiaochengchengchengcheng/enterprise-data-query-agent/releases/tag/v2.0.0) |
+| `v1.1.0` | 现代框架栈 Text-to-SQL | [查看 Release](https://github.com/xiaochengchengchengcheng/enterprise-data-query-agent/releases/tag/v1.1.0) |
 | `v1.0.0` | 基础 Text-to-SQL 自主取数智能体 | [查看 Release](https://github.com/xiaochengchengchengcheng/enterprise-data-query-agent/releases/tag/v1.0.0) |
 
 版本号遵循 [Semantic Versioning](https://semver.org/)。分支、提交和发布规则见 [VERSIONING.md](VERSIONING.md)。
