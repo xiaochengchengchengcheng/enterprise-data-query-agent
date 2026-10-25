@@ -16,13 +16,13 @@
 
 import os
 import json
-import time
 import logging
-from typing import Optional, List, Dict, Any, Generator
+import re
+from typing import Optional, List, Dict, Any
 from decimal import Decimal
 from datetime import datetime, date
 
-import requests
+from langchain_openai import ChatOpenAI
 
 from security_middleware import mask_sensitive_text, mask_dataframe
 
@@ -104,20 +104,19 @@ class LLMGateway:
         if not self.api_key:
             raise LLMGatewayError('LLM_API_KEY 未配置，请在 .env 文件中设置')
 
-        # 构建API端点URL
-        self.chat_url = f'{self.api_base}/chat/completions'
+        # LangChain 统一模型接口；兼容 DeepSeek 等 OpenAI-compatible API。
+        self._client = ChatOpenAI(
+            model=self.model_name,
+            api_key=self.api_key,
+            base_url=self.api_base,
+            timeout=self.request_timeout,
+            max_retries=self.max_retries,
+        )
 
         logger.info(
             'LLM网关初始化完成，API地址: %s, 模型: %s, 超时: %ds, 最大重试: %d',
             self.api_base, self.model_name, self.request_timeout, self.max_retries
         )
-
-    def _build_headers(self) -> Dict[str, str]:
-        """构建API请求头"""
-        return {
-            'Authorization': f'Bearer {self.api_key}',
-            'Content-Type': 'application/json',
-        }
 
     def _mask_messages(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
         """
@@ -169,78 +168,33 @@ class LLMGateway:
         if enable_mask:
             messages = self._mask_messages(messages)
 
-        payload = {
-            'model': self.model_name,
-            'messages': messages,
-            'temperature': temperature,
-            'max_tokens': max_tokens,
-        }
+        try:
+            response = self._client.bind(
+                temperature=temperature,
+                max_tokens=max_tokens,
+            ).invoke(messages)
+            raw_content = response.content
+            if isinstance(raw_content, str):
+                content = raw_content.strip()
+            else:
+                content = json.dumps(raw_content, ensure_ascii=False, default=str)
+            if not content:
+                raise LLMResponseError('LangChain 模型响应为空')
 
-        last_error = None
-        for attempt in range(1, self.max_retries + 1):
-            try:
-                logger.debug('LLM请求 第%d次尝试', attempt)
-
-                response = requests.post(
-                    self.chat_url,
-                    headers=self._build_headers(),
-                    json=payload,
-                    timeout=self.request_timeout,
-                )
-
-                # 检查HTTP状态码
-                if response.status_code != 200:
-                    error_body = response.text[:500] if response.text else '无响应体'
-                    raise LLMRequestError(
-                        f'API返回HTTP {response.status_code}: {error_body}'
-                    )
-
-                # 解析响应JSON
-                result = response.json()
-
-                # 提取生成内容
-                if 'choices' not in result or not result['choices']:
-                    raise LLMResponseError('API响应中缺少 choices 字段')
-
-                choice = result['choices'][0]
-                if 'message' not in choice or 'content' not in choice['message']:
-                    raise LLMResponseError('API响应中缺少 message.content 字段')
-
-                content = choice['message']['content'].strip()
-
-                logger.info('LLM请求成功，第%d次尝试，生成内容长度: %d', attempt, len(content))
-
-                return {
-                    'content': content,
-                    'finish_reason': choice.get('finish_reason', 'stop'),
-                    'usage': result.get('usage', {}),
-                    'model': result.get('model', self.model_name),
-                }
-
-            except requests.exceptions.Timeout as e:
-                last_error = LLMRequestError(f'请求超时（第{attempt}次）: {e}')
-                logger.warning('LLM请求超时（第%d次）: %s', attempt, e)
-
-            except requests.exceptions.ConnectionError as e:
-                last_error = LLMRequestError(f'连接失败（第{attempt}次）: {e}')
-                logger.warning('LLM连接失败（第%d次）: %s', attempt, e)
-
-            except requests.exceptions.RequestException as e:
-                last_error = LLMRequestError(f'请求异常（第{attempt}次）: {e}')
-                logger.warning('LLM请求异常（第%d次）: %s', attempt, e)
-
-            except (json.JSONDecodeError, KeyError, IndexError) as e:
-                last_error = LLMResponseError(f'响应解析失败（第{attempt}次）: {e}')
-                logger.warning('LLM响应解析失败（第%d次）: %s', attempt, e)
-
-            # 重试前等待（指数退避）
-            if attempt < self.max_retries:
-                wait_time = 2 ** attempt
-                logger.info('等待 %d 秒后重试...', wait_time)
-                time.sleep(wait_time)
-
-        # 所有重试均失败
-        raise last_error or LLMGatewayError('LLM调用失败，未知错误')
+            metadata = response.response_metadata or {}
+            usage = response.usage_metadata or metadata.get('token_usage', {})
+            logger.info('LangChain 模型调用成功，生成内容长度: %d', len(content))
+            return {
+                'content': content,
+                'finish_reason': metadata.get('finish_reason', 'stop'),
+                'usage': usage,
+                'model': metadata.get('model_name', self.model_name),
+            }
+        except LLMGatewayError:
+            raise
+        except Exception as exc:
+            logger.exception('LangChain 模型调用失败')
+            raise LLMRequestError('LangChain 模型调用失败: %s' % exc) from exc
 
     def extract_sql_from_response(self, content: str) -> Optional[str]:
         """
@@ -336,10 +290,6 @@ class LLMGateway:
 
         response = self.chat(messages, temperature=0.3, max_tokens=4096)
         return response['content']
-
-
-# 导入re模块（用于extract_sql_from_response方法）
-import re
 
 
 # ============================================================

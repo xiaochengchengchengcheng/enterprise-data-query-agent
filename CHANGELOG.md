@@ -2,6 +2,20 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/)，所有正式版本均通过 Git Tag 和 GitHub Release 发布。
 
+## 2.1.0 - 2026-10-25
+
+### Changed
+
+- Raised the runtime baseline from Python 3.9 to Python 3.11.
+- Upgraded LangGraph, FastAPI, Pydantic and Streamlit to current pinned releases.
+- Replaced direct model and remote embedding HTTP calls with LangChain integrations.
+- Replaced the hand-written MCP protocol loop with a FastMCP Tool/Resource server.
+- Moved blocking database, model and analysis work to FastAPI's worker thread pool.
+
+### Fixed
+
+- Explicitly close SQLite API-key connections for reliable Windows test cleanup.
+
 ## 2.0.0 - 2026-10-25
 
 ### Added

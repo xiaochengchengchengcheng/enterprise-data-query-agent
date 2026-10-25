@@ -10,7 +10,7 @@ import threading
 from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional
 
-import requests
+from langchain_openai import OpenAIEmbeddings
 
 from llm_gateway import LLMGateway
 from security_middleware import mask_sensitive_text
@@ -114,25 +114,20 @@ class ModelRegistry:
         if spec.kind == 'embedding-local':
             return [self._hash_embedding(text, spec.dimensions) for text in texts]
 
-        url = spec.api_base.rstrip('/') + '/embeddings'
         api_key = os.environ.get(spec.api_key_env, '')
         if not api_key:
             raise ValueError('%s 未配置' % spec.api_key_env)
         safe_texts = [mask_sensitive_text(text) for text in texts]
-        response = requests.post(
-            url,
-            headers={
-                'Authorization': 'Bearer ' + api_key,
-                'Content-Type': 'application/json',
-            },
-            json={'model': spec.model, 'input': safe_texts},
-            timeout=int(os.environ.get('EMBEDDING_REQUEST_TIMEOUT', '60')),
+        embeddings = OpenAIEmbeddings(
+            model=spec.model,
+            api_key=api_key,
+            base_url=spec.api_base,
+            request_timeout=int(os.environ.get('EMBEDDING_REQUEST_TIMEOUT', '60')),
         )
-        response.raise_for_status()
-        data = sorted(response.json().get('data', []), key=lambda item: item.get('index', 0))
-        if len(data) != len(texts):
+        vectors = embeddings.embed_documents(safe_texts)
+        if len(vectors) != len(texts):
             raise ValueError('Embedding API 返回数量不匹配')
-        return [item['embedding'] for item in data]
+        return vectors
 
     @staticmethod
     def _hash_embedding(text: str, dimensions: int) -> List[float]:

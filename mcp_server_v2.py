@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Dependency-free MCP stdio tool server for Python 3.9 deployments."""
+"""FastMCP server exposing the enterprise data analyst capabilities."""
 
-import json
 import logging
-import sys
-from typing import Any, Dict
+from typing import Any, Dict, Optional
+
+from fastmcp import FastMCP
 
 from advanced_agent_graph import advanced_data_analyst
 from model_registry import model_registry
@@ -13,164 +13,84 @@ from sql_agent_graph import run_agent
 
 logger = logging.getLogger(__name__)
 
-
-TOOLS = [
-    {
-        'name': 'nl2sql_query',
-        'description': 'Convert a natural-language question to read-only SQL and return masked data.',
-        'inputSchema': {
-            'type': 'object',
-            'properties': {
-                'user_query': {'type': 'string'},
-                'session_id': {'type': 'string'},
-            },
-            'required': ['user_query'],
-        },
-    },
-    {
-        'name': 'analysis_plan',
-        'description': 'Create a RAG-enhanced analysis plan that requires human approval.',
-        'inputSchema': {
-            'type': 'object',
-            'properties': {
-                'user_query': {'type': 'string'},
-                'session_id': {'type': 'string'},
-                'chat_model': {'type': 'string'},
-                'embedding_model': {'type': 'string'},
-            },
-            'required': ['user_query'],
-        },
-    },
-    {
-        'name': 'analysis_review',
-        'description': 'Approve, reject, or revise a pending analysis plan.',
-        'inputSchema': {
-            'type': 'object',
-            'properties': {
-                'analysis_id': {'type': 'string'},
-                'approved': {'type': 'boolean'},
-                'feedback': {'type': 'string'},
-            },
-            'required': ['analysis_id', 'approved'],
-        },
-    },
-    {
-        'name': 'models_list',
-        'description': 'List registered chat and embedding models.',
-        'inputSchema': {'type': 'object', 'properties': {}},
-    },
-    {
-        'name': 'rag_search',
-        'description': 'Search business metadata and terminology in the local vector store.',
-        'inputSchema': {
-            'type': 'object',
-            'properties': {
-                'query': {'type': 'string'},
-                'top_k': {'type': 'integer', 'minimum': 1, 'maximum': 20},
-                'namespace': {'type': 'string'},
-                'embedding_model': {'type': 'string'},
-            },
-            'required': ['query'],
-        },
-    },
-]
+mcp = FastMCP(
+    name='enterprise-data-analyst',
+    instructions=(
+        '企业内网智能数据分析服务。仅执行只读 SQL，返回结果已脱敏；'
+        '深度分析计划必须先由用户确认。'
+    ),
+    version='2.1.0',
+)
 
 
-def _call_tool(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
-    if name == 'nl2sql_query':
-        return run_agent(arguments['user_query'], arguments.get('session_id', ''))
-    if name == 'analysis_plan':
-        return advanced_data_analyst.create_plan(
-            arguments['user_query'],
-            arguments.get('session_id'),
-            arguments.get('chat_model'),
-            arguments.get('embedding_model'),
-        )
-    if name == 'analysis_review':
-        return advanced_data_analyst.review_plan(
-            arguments['analysis_id'],
-            bool(arguments['approved']),
-            arguments.get('feedback', ''),
-        )
-    if name == 'models_list':
-        return {'models': model_registry.list_models()}
-    if name == 'rag_search':
-        return {'results': rag_store.search(
-            arguments['query'],
-            int(arguments.get('top_k', 5)),
-            arguments.get('namespace', 'business'),
-            arguments.get('embedding_model'),
-        )}
-    raise KeyError('未知工具: ' + name)
+@mcp.tool
+def nl2sql_query(user_query: str, session_id: str = '') -> Dict[str, Any]:
+    """Convert a natural-language question to read-only SQL and return masked data."""
+    return run_agent(user_query, session_id)
 
 
-def handle_message(message: Dict[str, Any]) -> Dict[str, Any]:
-    request_id = message.get('id')
-    method = message.get('method', '')
-    params = message.get('params') or {}
-    if method == 'initialize':
-        return {
-            'jsonrpc': '2.0',
-            'id': request_id,
-            'result': {
-                'protocolVersion': params.get('protocolVersion', '2024-11-05'),
-                'capabilities': {'tools': {'listChanged': False}},
-                'serverInfo': {'name': 'enterprise-data-analyst', 'version': '2.0.0'},
-            },
-        }
-    if method == 'ping':
-        return {'jsonrpc': '2.0', 'id': request_id, 'result': {}}
-    if method == 'tools/list':
-        return {'jsonrpc': '2.0', 'id': request_id, 'result': {'tools': TOOLS}}
-    if method == 'tools/call':
-        try:
-            value = _call_tool(params.get('name', ''), params.get('arguments') or {})
-            return {
-                'jsonrpc': '2.0',
-                'id': request_id,
-                'result': {
-                    'content': [{
-                        'type': 'text',
-                        'text': json.dumps(value, ensure_ascii=False, default=str),
-                    }],
-                    'isError': False,
-                },
-            }
-        except Exception as exc:
-            return {
-                'jsonrpc': '2.0',
-                'id': request_id,
-                'result': {
-                    'content': [{'type': 'text', 'text': str(exc)}],
-                    'isError': True,
-                },
-            }
+@mcp.tool
+def analysis_plan(
+    user_query: str,
+    session_id: Optional[str] = None,
+    chat_model: Optional[str] = None,
+    embedding_model: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Create a RAG-enhanced analysis plan that requires human approval."""
+    return advanced_data_analyst.create_plan(
+        user_query,
+        session_id,
+        chat_model,
+        embedding_model,
+    )
+
+
+@mcp.tool
+def analysis_review(
+    analysis_id: str,
+    approved: bool,
+    feedback: str = '',
+) -> Dict[str, Any]:
+    """Approve, reject, or revise a pending analysis plan."""
+    return advanced_data_analyst.review_plan(analysis_id, approved, feedback)
+
+
+@mcp.tool
+def models_list() -> Dict[str, Any]:
+    """List registered chat and embedding models without exposing credentials."""
+    return {'models': model_registry.list_models()}
+
+
+@mcp.tool
+def rag_search(
+    query: str,
+    top_k: int = 5,
+    namespace: str = 'business',
+    embedding_model: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Search business metadata and terminology in the local vector store."""
+    if top_k < 1 or top_k > 20:
+        raise ValueError('top_k 必须在 1 到 20 之间')
     return {
-        'jsonrpc': '2.0',
-        'id': request_id,
-        'error': {'code': -32601, 'message': 'Method not found: ' + method},
+        'results': rag_store.search(
+            query,
+            top_k,
+            namespace,
+            embedding_model,
+        )
     }
 
 
+@mcp.resource('analyst://models')
+def registered_models() -> Dict[str, Any]:
+    """Return the public model registry as an MCP resource."""
+    return {'models': model_registry.list_models()}
+
+
 def run_stdio_server() -> None:
-    logging.basicConfig(level=logging.WARNING, stream=sys.stderr)
-    for raw_line in sys.stdin:
-        line = raw_line.strip()
-        if not line:
-            continue
-        try:
-            message = json.loads(line)
-            if 'id' not in message:
-                continue
-            response = handle_message(message)
-        except Exception as exc:
-            response = {
-                'jsonrpc': '2.0',
-                'id': None,
-                'error': {'code': -32700, 'message': str(exc)},
-            }
-        sys.stdout.write(json.dumps(response, ensure_ascii=False) + '\n')
-        sys.stdout.flush()
+    """Run the FastMCP server over stdio for local MCP clients."""
+    logging.basicConfig(level=logging.WARNING)
+    mcp.run(transport='stdio')
 
 
 if __name__ == '__main__':

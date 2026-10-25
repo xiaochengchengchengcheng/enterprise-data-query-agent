@@ -1,6 +1,6 @@
 ﻿# 企业 AI 智能数据分析师
 
-> **English project name:** Enterprise AI Data Analyst · v2.0
+> **English project name:** Enterprise AI Data Analyst · v2.1
 
 这不再只是一个 Text-to-SQL 工具。系统基于 LangGraph 编排“需求理解 → RAG 检索 → 分析计划 → 人工确认 → 多数据集查询 → Python 深度分析 → ECharts 报告”的完整工作流，同时保留 v1 `/api/query` 接口用于快速取数。
 
@@ -8,6 +8,7 @@
 
 | 版本 | 定位 | 发布说明 |
 |------|------|----------|
+| `v2.1.0` | LangChain + LangGraph + FastAPI + FastMCP 现代化版本 | [查看 Release](https://github.com/xiaochengchengchengcheng/enterprise-data-query-agent/releases/tag/v2.1.0) |
 | `v2.0.0` | 企业 AI 智能数据分析师 | [查看 Release](https://github.com/xiaochengchengchengcheng/enterprise-data-query-agent/releases/tag/v2.0.0) |
 | `v1.0.0` | 基础 Text-to-SQL 自主取数智能体 | [查看 Release](https://github.com/xiaochengchengchengcheng/enterprise-data-query-agent/releases/tag/v1.0.0) |
 
@@ -25,14 +26,14 @@
 | 人工反馈机制 | 先展示分析计划，用户可以批准、驳回或提出修改意见 |
 | RAG 检索增强 | SQLite 持久化向量库检索业务元数据和术语；可接 OpenAI 兼容 Embedding API |
 | 多模型调度 | Chat/Embedding 模型注册表支持请求级动态选择 |
-| MCP 服务器 | Python 3.9 可运行的 MCP stdio Tool Server |
+| MCP 服务器 | FastMCP 4 Tool/Resource Server，支持 stdio 与扩展传输 |
 | API Key 管理 | Key 仅保存 PBKDF2 哈希，支持 Scope、过期时间、撤销和使用记录 |
 | 安全合规 | 只读 SQL、数据脱敏、IP 白名单、审计日志和 Python 资源隔离 |
 
 ### 技术栈
 
-- **Python 3.9 / LangGraph** — 兼容既有部署环境的有状态智能体工作流
-- **FastAPI / Streamlit** — REST API 与人工确认界面
+- **Python 3.11 / LangChain / LangGraph** — 统一模型与检索组件，并编排有状态智能体工作流
+- **FastAPI / FastMCP / Streamlit** — REST API、MCP 服务与人工确认界面
 - **MySQL / PyMySQL** — 数据库只读查询
 - **SQLite Vector Store** — 零额外服务的业务元数据向量库
 - **Docker / pandas / NumPy / SciPy / scikit-learn** — 隔离的深度分析运行时
@@ -72,7 +73,7 @@ project_root/
 ├── report_generator.py         # ECharts HTML / Markdown 报告
 ├── api_key_manager.py          # API Key 生命周期与 Scope 管理
 ├── conversation_store.py       # 多轮对话与分析任务状态
-├── mcp_server_v2.py            # MCP stdio Tool Server
+├── mcp_server_v2.py            # FastMCP Tool / Resource Server
 ├── fastapi_server.py           # FastAPI 后端接口服务
 ├── streamlit_web.py            # Streamlit 轻量化Web页面
 ├── docker/                     # Python 分析沙箱镜像
@@ -125,6 +126,12 @@ curl -X POST http://127.0.0.1:8000/api/v2/analyses/plan \
 
 ### MCP Server
 
+直接运行 FastMCP stdio 服务：
+
+```bash
+python mcp_server_v2.py
+```
+
 ```json
 {
   "mcpServers": {
@@ -149,13 +156,13 @@ curl -X POST http://127.0.0.1:8000/api/v2/analyses/plan \
 
 ### 1. 安装 Miniconda3
 
-从 https://docs.conda.io/en/latest/miniconda.html 下载并安装 Miniconda3（Python 3.9 版本）。
+从 https://docs.conda.io/en/latest/miniconda.html 下载并安装 Miniconda3，并使用 Python 3.11 环境。
 
 ### 2. 创建虚拟环境
 
 ```bash
 # 打开 Anaconda Prompt (Miniconda3)
-conda create -n data_agent python=3.9 -y
+conda create -n data_agent python=3.11 -y
 conda activate data_agent
 ```
 
@@ -302,7 +309,7 @@ source ~/.bashrc
 ### 2. 创建环境并安装依赖
 
 ```bash
-conda create -n data_agent python=3.9 -y
+conda create -n data_agent python=3.11 -y
 conda activate data_agent
 pip install -r requirements.txt
 ```

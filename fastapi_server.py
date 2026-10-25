@@ -63,12 +63,12 @@ class QueryResponse(BaseModel):
     session_id: str = Field(..., description='会话ID')
     user_query: str = Field(..., description='用户原始提问')
     generated_sql: str = Field('', description='生成的SQL语句')
-    query_columns: List[str] = Field([], description='查询结果列名')
+    query_columns: List[str] = Field(default_factory=list, description='查询结果列名')
     returned_rows: int = Field(0, description='返回数据行数')
     query_duration_ms: float = Field(0.0, description='查询耗时（毫秒）')
     analysis: str = Field('', description='业务分析结论')
-    data: List[Dict[str, Any]] = Field([], description='脱敏后的查询结果')
-    steps: List[Dict[str, Any]] = Field([], description='执行步骤记录')
+    data: List[Dict[str, Any]] = Field(default_factory=list, description='脱敏后的查询结果')
+    steps: List[Dict[str, Any]] = Field(default_factory=list, description='执行步骤记录')
     error: str = Field('', description='错误信息（如有）')
 
 
@@ -95,7 +95,7 @@ class AnalysisReviewRequest(BaseModel):
 class RAGDocument(BaseModel):
     id: Optional[str] = None
     content: str = Field(..., min_length=1, max_length=20000)
-    metadata: Dict[str, Any] = Field({})
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 class RAGUpsertRequest(BaseModel):
@@ -106,13 +106,13 @@ class RAGUpsertRequest(BaseModel):
 
 class APIKeyCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
-    scopes: List[str] = Field(['analysis'])
+    scopes: List[str] = Field(default_factory=lambda: ['analysis'])
     expires_in_days: Optional[int] = Field(None, ge=1, le=3650)
 
 
 class ModelRegistrationRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
-    kind: str = Field(..., regex='^(chat|embedding|embedding-local)$')
+    kind: str = Field(..., pattern='^(chat|embedding|embedding-local)$')
     model: str = Field(..., min_length=1, max_length=200)
     api_base: str = ''
     api_key_env: str = ''
@@ -129,8 +129,8 @@ _start_time = time.time()
 # 创建FastAPI应用
 app = FastAPI(
     title='Enterprise AI Data Analyst API',
-    description='基于 StateGraph 的 Text-to-SQL、Python 深度分析、RAG 与智能报告服务',
-    version='2.0.0',
+    description='基于 LangChain + LangGraph 的 Text-to-SQL、Python 深度分析、RAG 与智能报告服务',
+    version='2.1.0',
     docs_url='/docs',
     redoc_url='/redoc',
 )
@@ -223,14 +223,14 @@ async def health_check():
     uptime = time.time() - _start_time
     return HealthResponse(
         status='running',
-        version='2.0.0',
+        version='2.1.0',
         timestamp=time.strftime('%Y-%m-%d %H:%M:%S'),
         uptime_seconds=round(uptime, 2),
     )
 
 
 @app.post('/api/query', response_model=QueryResponse, tags=['取数'], dependencies=[Depends(require_scope('query'))])
-async def execute_query(request: QueryRequest):
+def execute_query(request: QueryRequest):
     """
     执行取数查询
 
@@ -281,7 +281,7 @@ async def execute_query(request: QueryRequest):
 
 
 @app.get('/api/history', tags=['审计'])
-async def get_audit_logs(lines: int = 50, _identity: Dict[str, Any] = Depends(require_scope('audit:read'))):
+def get_audit_logs(lines: int = 50, _identity: Dict[str, Any] = Depends(require_scope('audit:read'))):
     """
     获取审计日志（最近N行）
 
@@ -309,7 +309,7 @@ async def get_audit_logs(lines: int = 50, _identity: Dict[str, Any] = Depends(re
 
 
 @app.post('/api/v2/analyses/plan', tags=['AI 数据分析师'])
-async def create_analysis_plan(
+def create_analysis_plan(
     request: AnalysisPlanRequest,
     _identity: Dict[str, Any] = Depends(require_scope('analysis')),
 ):
@@ -326,7 +326,7 @@ async def create_analysis_plan(
 
 
 @app.post('/api/v2/analyses/{analysis_id}/review', tags=['AI 数据分析师'])
-async def review_analysis_plan(
+def review_analysis_plan(
     analysis_id: str,
     request: AnalysisReviewRequest,
     _identity: Dict[str, Any] = Depends(require_scope('analysis')),
@@ -347,7 +347,7 @@ async def review_analysis_plan(
 
 
 @app.get('/api/v2/analyses/{analysis_id}', tags=['AI 数据分析师'])
-async def get_analysis_task(
+def get_analysis_task(
     analysis_id: str,
     _identity: Dict[str, Any] = Depends(require_scope('analysis')),
 ):
@@ -371,7 +371,7 @@ def _report_file(analysis_id: str, report_type: str) -> FileResponse:
 
 
 @app.get('/api/v2/analyses/{analysis_id}/report/html', tags=['智能报告'])
-async def get_html_report(
+def get_html_report(
     analysis_id: str,
     _identity: Dict[str, Any] = Depends(require_scope('reports:read')),
 ):
@@ -379,7 +379,7 @@ async def get_html_report(
 
 
 @app.get('/api/v2/analyses/{analysis_id}/report/markdown', tags=['智能报告'])
-async def get_markdown_report(
+def get_markdown_report(
     analysis_id: str,
     _identity: Dict[str, Any] = Depends(require_scope('reports:read')),
 ):
@@ -387,24 +387,24 @@ async def get_markdown_report(
 
 
 @app.get('/api/v2/models', tags=['模型管理'])
-async def list_models(_identity: Dict[str, Any] = Depends(require_scope('models:read'))):
+def list_models(_identity: Dict[str, Any] = Depends(require_scope('models:read'))):
     return {'models': model_registry.list_models()}
 
 
 @app.post('/api/v2/models', tags=['模型管理'])
-async def register_model(
+def register_model(
     request: ModelRegistrationRequest,
     _identity: Dict[str, Any] = Depends(require_scope('admin')),
 ):
     try:
-        model_registry.register(ModelSpec(**request.dict()))
+        model_registry.register(ModelSpec(**request.model_dump()))
         return {'registered': request.name, 'models': model_registry.list_models()}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
 
 @app.post('/api/v2/rag/sync', tags=['RAG'])
-async def sync_rag_metadata(
+def sync_rag_metadata(
     embedding_model: Optional[str] = None,
     _identity: Dict[str, Any] = Depends(require_scope('rag:write')),
 ):
@@ -415,12 +415,12 @@ async def sync_rag_metadata(
 
 
 @app.post('/api/v2/rag/documents', tags=['RAG'])
-async def upsert_rag_documents(
+def upsert_rag_documents(
     request: RAGUpsertRequest,
     _identity: Dict[str, Any] = Depends(require_scope('rag:write')),
 ):
     count = rag_store.upsert(
-        [item.dict() for item in request.documents],
+        [item.model_dump() for item in request.documents],
         request.namespace,
         request.embedding_model,
     )
@@ -428,7 +428,7 @@ async def upsert_rag_documents(
 
 
 @app.get('/api/v2/rag/search', tags=['RAG'])
-async def search_rag(
+def search_rag(
     query: str,
     top_k: int = 5,
     namespace: str = 'business',
@@ -439,7 +439,7 @@ async def search_rag(
 
 
 @app.post('/api/v2/api-keys', tags=['API Key 管理'])
-async def create_api_key(
+def create_api_key(
     request: APIKeyCreateRequest,
     _identity: Dict[str, Any] = Depends(require_scope('admin')),
 ):
@@ -452,12 +452,12 @@ async def create_api_key(
 
 
 @app.get('/api/v2/api-keys', tags=['API Key 管理'])
-async def list_api_keys(_identity: Dict[str, Any] = Depends(require_scope('admin'))):
+def list_api_keys(_identity: Dict[str, Any] = Depends(require_scope('admin'))):
     return {'keys': api_key_manager.list_keys()}
 
 
 @app.delete('/api/v2/api-keys/{key_id}', tags=['API Key 管理'])
-async def revoke_api_key(
+def revoke_api_key(
     key_id: str,
     _identity: Dict[str, Any] = Depends(require_scope('admin')),
 ):
@@ -483,7 +483,7 @@ def start_server():
     port = int(os.environ.get('SERVER_PORT', '8000'))
 
     logger.info('=' * 50)
-    logger.info('企业 AI 智能数据分析师 v2.0.0 服务启动')
+    logger.info('企业 AI 智能数据分析师 v2.1.0 服务启动')
     logger.info('监听地址: %s:%d', host, port)
     logger.info('API文档: http://%s:%d/docs', host if host != '0.0.0.0' else '127.0.0.1', port)
     logger.info('=' * 50)
